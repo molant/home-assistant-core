@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from jaraco.abode.devices.alarm import Alarm
+from jaraco.abode.exceptions import Exception as AbodeException
 
 from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntity,
@@ -14,7 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import AbodeSystem
-from .const import DOMAIN
+from .const import DOMAIN, LOGGER
 from .entity import AbodeDevice
 
 
@@ -63,6 +64,30 @@ class AbodeAlarm(AbodeDevice, AlarmControlPanelEntity):
     def alarm_arm_away(self, code: str | None = None) -> None:
         """Send arm away command."""
         self._device.set_away()
+
+    def trigger_manual_alarm(self, alarm_type: str) -> None:
+        """Trigger a manual alarm."""
+        try:
+            self._device.trigger_manual_alarm(alarm_type)
+            LOGGER.info("Triggered manual alarm of type: %s", alarm_type)
+        except AbodeException as ex:
+            LOGGER.error("Failed to trigger manual alarm: %s", ex)
+
+    def acknowledge_timeline_event(self, timeline_id: str) -> None:
+        """Acknowledge a timeline alarm event."""
+        try:
+            self.hass.data[DOMAIN].abode.acknowledge_timeline_event(timeline_id)
+            LOGGER.info("Acknowledged timeline event: %s", timeline_id)
+        except AbodeException as ex:
+            LOGGER.error("Failed to acknowledge timeline event: %s", ex)
+
+    def dismiss_timeline_event(self, timeline_id: str) -> None:
+        """Dismiss a timeline alarm event."""
+        try:
+            self.hass.data[DOMAIN].abode.dismiss_timeline_event(timeline_id)
+            LOGGER.info("Dismissed timeline event: %s", timeline_id)
+        except AbodeException as ex:
+            LOGGER.error("Failed to dismiss timeline event: %s", ex)
 
     @property
     def extra_state_attributes(self) -> dict[str, str]:

@@ -65,6 +65,44 @@
         }
       },
       "name": "Trigger automation"
+    },
+    "trigger_alarm": {
+      "description": "Triggers a manual alarm of the specified type.",
+      "fields": {
+        "alarm_type": {
+          "description": "Type of alarm to trigger (PANIC, SILENT_PANIC, MEDICAL, CO, SMOKE_CO, SMOKE, BURGLAR).",
+          "name": "Alarm type"
+        }
+      },
+      "name": "Trigger alarm"
+    },
+    "acknowledge_alarm": {
+      "description": "Acknowledges/verifies a timeline alarm event.",
+      "fields": {
+        "timeline_id": {
+          "description": "ID of the timeline event to acknowledge.",
+          "name": "Timeline ID"
+        }
+      },
+      "name": "Acknowledge alarm"
+    },
+    "dismiss_alarm": {
+      "description": "Dismisses/ignores a timeline alarm event.",
+      "fields": {
+        "timeline_id": {
+          "description": "ID of the timeline event to dismiss.",
+          "name": "Timeline ID"
+        }
+      },
+      "name": "Dismiss alarm"
+    },
+    "enable_test_mode": {
+      "description": "Enables test mode. Alarms will not be dispatched to the monitoring service. Test mode automatically turns off after 30 minutes.",
+      "name": "Enable test mode"
+    },
+    "disable_test_mode": {
+      "description": "Disables test mode.",
+      "name": "Disable test mode"
     }
   }
 }

@@ -28,3 +28,31 @@ trigger_automation:
         entity:
           integration: abode
           domain: switch
+
+trigger_alarm:
+  fields:
+    alarm_type:
+      required: true
+      example: PANIC
+      selector:
+        text:
+
+acknowledge_alarm:
+  fields:
+    timeline_id:
+      required: true
+      example: "12345"
+      selector:
+        text:
+
+dismiss_alarm:
+  fields:
+    timeline_id:
+      required: true
+      example: "12345"
+      selector:
+        text:
+
+enable_test_mode: {}
+
+disable_test_mode: {}
