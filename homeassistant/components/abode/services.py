@@ -15,9 +15,16 @@ from .const import DOMAIN, LOGGER
 SERVICE_SETTINGS = "change_setting"
 SERVICE_CAPTURE_IMAGE = "capture_image"
 SERVICE_TRIGGER_AUTOMATION = "trigger_automation"
+SERVICE_TRIGGER_ALARM = "trigger_alarm"
+SERVICE_ACKNOWLEDGE_ALARM = "acknowledge_alarm"
+SERVICE_DISMISS_ALARM = "dismiss_alarm"
+SERVICE_ENABLE_TEST_MODE = "enable_test_mode"
+SERVICE_DISABLE_TEST_MODE = "disable_test_mode"
 
 ATTR_SETTING = "setting"
 ATTR_VALUE = "value"
+ATTR_ALARM_TYPE = "alarm_type"
+ATTR_TIMELINE_ID = "timeline_id"
 
 
 CHANGE_SETTING_SCHEMA = vol.Schema(
@@ -27,6 +34,16 @@ CHANGE_SETTING_SCHEMA = vol.Schema(
 CAPTURE_IMAGE_SCHEMA = vol.Schema({ATTR_ENTITY_ID: cv.entity_ids})
 
 AUTOMATION_SCHEMA = vol.Schema({ATTR_ENTITY_ID: cv.entity_ids})
+
+TRIGGER_ALARM_SCHEMA = vol.Schema({vol.Required(ATTR_ALARM_TYPE): cv.string})
+
+ACKNOWLEDGE_ALARM_SCHEMA = vol.Schema({vol.Required(ATTR_TIMELINE_ID): cv.string})
+
+DISMISS_ALARM_SCHEMA = vol.Schema({vol.Required(ATTR_TIMELINE_ID): cv.string})
+
+ENABLE_TEST_MODE_SCHEMA = vol.Schema({})
+
+DISABLE_TEST_MODE_SCHEMA = vol.Schema({})
 
 
 def _change_setting(call: ServiceCall) -> None:
@@ -70,6 +87,70 @@ def _trigger_automation(call: ServiceCall) -> None:
         dispatcher_send(call.hass, signal)
 
 
+async def _trigger_alarm(call: ServiceCall) -> None:
+    """Trigger a manual alarm."""
+    alarm_type = call.data[ATTR_ALARM_TYPE]
+
+    try:
+        alarm = await call.hass.async_add_executor_job(
+            call.hass.data[DOMAIN].abode.get_alarm
+        )
+        await call.hass.async_add_executor_job(
+            alarm.trigger_manual_alarm, alarm_type
+        )
+        LOGGER.info("Triggered manual alarm of type: %s", alarm_type)
+    except AbodeException as ex:
+        LOGGER.error("Failed to trigger manual alarm: %s", ex)
+
+
+async def _acknowledge_alarm(call: ServiceCall) -> None:
+    """Acknowledge a timeline alarm event."""
+    timeline_id = call.data[ATTR_TIMELINE_ID]
+
+    try:
+        await call.hass.async_add_executor_job(
+            call.hass.data[DOMAIN].abode.acknowledge_timeline_event, timeline_id
+        )
+        LOGGER.info("Acknowledged timeline event: %s", timeline_id)
+    except AbodeException as ex:
+        LOGGER.error("Failed to acknowledge timeline event: %s", ex)
+
+
+async def _dismiss_alarm(call: ServiceCall) -> None:
+    """Dismiss a timeline alarm event."""
+    timeline_id = call.data[ATTR_TIMELINE_ID]
+
+    try:
+        await call.hass.async_add_executor_job(
+            call.hass.data[DOMAIN].abode.dismiss_timeline_event, timeline_id
+        )
+        LOGGER.info("Dismissed timeline event: %s", timeline_id)
+    except AbodeException as ex:
+        LOGGER.error("Failed to dismiss timeline event: %s", ex)
+
+
+async def _enable_test_mode(call: ServiceCall) -> None:
+    """Enable test mode."""
+    try:
+        await call.hass.async_add_executor_job(
+            call.hass.data[DOMAIN].abode.set_test_mode, True
+        )
+        LOGGER.info("Test mode enabled")
+    except AbodeException as ex:
+        LOGGER.error("Failed to enable test mode: %s", ex)
+
+
+async def _disable_test_mode(call: ServiceCall) -> None:
+    """Disable test mode."""
+    try:
+        await call.hass.async_add_executor_job(
+            call.hass.data[DOMAIN].abode.set_test_mode, False
+        )
+        LOGGER.info("Test mode disabled")
+    except AbodeException as ex:
+        LOGGER.error("Failed to disable test mode: %s", ex)
+
+
 @callback
 def async_setup_services(hass: HomeAssistant) -> None:
     """Home Assistant services."""
@@ -87,4 +168,27 @@ def async_setup_services(hass: HomeAssistant) -> None:
         SERVICE_TRIGGER_AUTOMATION,
         _trigger_automation,
         schema=AUTOMATION_SCHEMA,
+    )
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_TRIGGER_ALARM, _trigger_alarm, schema=TRIGGER_ALARM_SCHEMA
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ACKNOWLEDGE_ALARM,
+        _acknowledge_alarm,
+        schema=ACKNOWLEDGE_ALARM_SCHEMA,
+    )
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_DISMISS_ALARM, _dismiss_alarm, schema=DISMISS_ALARM_SCHEMA
+    )
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_ENABLE_TEST_MODE, _enable_test_mode, schema=ENABLE_TEST_MODE_SCHEMA
+    )
+
+    hass.services.async_register(
+        DOMAIN, SERVICE_DISABLE_TEST_MODE, _disable_test_mode, schema=DISABLE_TEST_MODE_SCHEMA
     )

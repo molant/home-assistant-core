@@ -3,7 +3,12 @@
 from unittest.mock import patch
 
 from homeassistant.components.abode.const import DOMAIN
-from homeassistant.components.abode.services import SERVICE_TRIGGER_AUTOMATION
+from homeassistant.components.abode.services import (
+    SERVICE_ACKNOWLEDGE_ALARM,
+    SERVICE_DISMISS_ALARM,
+    SERVICE_TRIGGER_ALARM,
+    SERVICE_TRIGGER_AUTOMATION,
+)
 from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN
 from homeassistant.const import (
     ATTR_ENTITY_ID,
@@ -21,6 +26,8 @@ AUTOMATION_ID = "switch.test_automation"
 AUTOMATION_UID = "47fae27488f74f55b964a81a066c3a01"
 DEVICE_ID = "switch.test_switch"
 DEVICE_UID = "0012a4d3614cb7e2b8c9abea31d2fb2a"
+PANIC_ALARM_ID = "switch.test_alarm_panic_alarm"
+TEST_MODE_ID = "switch.test_alarm_test_mode"
 
 
 async def test_entity_registry(
@@ -125,3 +132,117 @@ async def test_trigger_automation(hass: HomeAssistant) -> None:
         await hass.async_block_till_done()
 
         mock.assert_called_once()
+
+
+async def test_manual_alarm_switch_attributes(hass: HomeAssistant) -> None:
+    """Test the manual alarm switch attributes are correct."""
+    await setup_platform(hass, SWITCH_DOMAIN)
+
+    state = hass.states.get(PANIC_ALARM_ID)
+    assert state is not None
+    assert state.state == STATE_OFF
+
+
+async def test_manual_alarm_switch_turn_on(hass: HomeAssistant) -> None:
+    """Test the manual alarm switch can be turned on."""
+    await setup_platform(hass, SWITCH_DOMAIN)
+
+    with patch("jaraco.abode.devices.alarm.Alarm.trigger_manual_alarm") as mock:
+        mock.return_value = {"event_id": "test_event_123"}
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_ON,
+            {ATTR_ENTITY_ID: PANIC_ALARM_ID},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+
+        mock.assert_called_once_with("PANIC")
+
+
+async def test_test_mode_switch_attributes(hass: HomeAssistant) -> None:
+    """Test the test mode switch attributes are correct."""
+    await setup_platform(hass, SWITCH_DOMAIN)
+
+    state = hass.states.get(TEST_MODE_ID)
+    assert state is not None
+
+
+async def test_test_mode_switch_turn_on(hass: HomeAssistant) -> None:
+    """Test the test mode switch can be turned on."""
+    await setup_platform(hass, SWITCH_DOMAIN)
+
+    with patch("jaraco.abode.Abode.set_test_mode") as mock:
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_ON,
+            {ATTR_ENTITY_ID: TEST_MODE_ID},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+
+        mock.assert_called_once_with(True)
+
+
+async def test_test_mode_switch_turn_off(hass: HomeAssistant) -> None:
+    """Test the test mode switch can be turned off."""
+    await setup_platform(hass, SWITCH_DOMAIN)
+
+    with patch("jaraco.abode.Abode.set_test_mode") as mock:
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_OFF,
+            {ATTR_ENTITY_ID: TEST_MODE_ID},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+
+        mock.assert_called_once_with(False)
+
+
+async def test_trigger_alarm_service(hass: HomeAssistant) -> None:
+    """Test the trigger alarm service."""
+    await setup_platform(hass, SWITCH_DOMAIN)
+
+    with patch("jaraco.abode.devices.alarm.Alarm.trigger_manual_alarm") as mock:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_TRIGGER_ALARM,
+            {"alarm_type": "PANIC"},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+
+        mock.assert_called_once_with("PANIC")
+
+
+async def test_acknowledge_alarm_service(hass: HomeAssistant) -> None:
+    """Test the acknowledge alarm service."""
+    await setup_platform(hass, SWITCH_DOMAIN)
+
+    with patch("jaraco.abode.Abode.acknowledge_timeline_event") as mock:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_ACKNOWLEDGE_ALARM,
+            {"timeline_id": "12345"},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+
+        mock.assert_called_once_with("12345")
+
+
+async def test_dismiss_alarm_service(hass: HomeAssistant) -> None:
+    """Test the dismiss alarm service."""
+    await setup_platform(hass, SWITCH_DOMAIN)
+
+    with patch("jaraco.abode.Abode.dismiss_timeline_event") as mock:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_DISMISS_ALARM,
+            {"timeline_id": "12345"},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+
+        mock.assert_called_once_with("12345")
