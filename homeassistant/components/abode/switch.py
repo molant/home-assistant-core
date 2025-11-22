@@ -2,22 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from jaraco.abode.devices.alarm import Alarm
 from jaraco.abode.devices.switch import Switch
 from jaraco.abode.exceptions import Exception as AbodeException
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import DOMAIN, LOGGER
-from . import AbodeSystem
 from .entity import AbodeAutomation, AbodeDevice
+
+if TYPE_CHECKING:
+    from . import AbodeConfigEntry, AbodeSystem
 
 try:
     from jaraco.abode.helpers.timeline import Groups as TimelineGroups
@@ -44,32 +45,32 @@ ALARM_TYPE_EVENT_CODES = {
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: AbodeConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Abode switch devices."""
-    data: AbodeSystem = hass.data[DOMAIN]
+    data: AbodeSystem = entry.runtime_data
 
     entities: list[SwitchEntity] = [
-        AbodeSwitch(data, device)
+        AbodeSwitch(entry, device)
         for device_type in DEVICE_TYPES
         for device in data.abode.get_devices(generic_type=device_type)
     ]
 
     entities.extend(
-        AbodeAutomationSwitch(data, automation)
+        AbodeAutomationSwitch(entry, automation)
         for automation in data.abode.get_automations()
     )
 
     # Add manual alarm switches
     alarm = await hass.async_add_executor_job(data.abode.get_alarm)
     entities.extend(
-        AbodeManualAlarmSwitch(data, alarm, alarm_type)
+        AbodeManualAlarmSwitch(entry, alarm, alarm_type)
         for alarm_type in MANUAL_ALARM_TYPES
     )
 
     # Add test mode switch
-    entities.append(AbodeTestModeSwitch(data, alarm))
+    entities.append(AbodeTestModeSwitch(entry, alarm))
 
     async_add_entities(entities)
 
@@ -159,10 +160,11 @@ class AbodeManualAlarmSwitch(SwitchEntity):
     }
 
     def __init__(
-        self, data: AbodeSystem, device: Alarm, alarm_type: str
+        self, entry: AbodeConfigEntry, device: Alarm, alarm_type: str
     ) -> None:
         """Initialize the manual alarm switch."""
-        self._data = data
+        self._entry = entry
+        self._data = entry.runtime_data
         self._device = device
         self._alarm_type = alarm_type
         self._attr_unique_id = f"{device.uuid}-manual-alarm-{alarm_type.lower()}"
@@ -323,9 +325,10 @@ class AbodeTestModeSwitch(SwitchEntity):
     _attr_icon = "mdi:test-tube"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(self, data: AbodeSystem, alarm: Alarm) -> None:
+    def __init__(self, entry: AbodeConfigEntry, alarm: Alarm) -> None:
         """Initialize the test mode switch."""
-        self._data = data
+        self._entry = entry
+        self._data = entry.runtime_data
         self._alarm = alarm
         self._is_on = False
         self._user_enabled = False  # Track if user explicitly enabled test mode

@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from jaraco.abode.exceptions import Exception as AbodeException
 import voluptuous as vol
 
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import ATTR_ENTITY_ID
 from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import dispatcher_send
 
 from .const import DOMAIN, LOGGER
+
+if TYPE_CHECKING:
+    from . import AbodeConfigEntry
 
 SERVICE_SETTINGS = "change_setting"
 SERVICE_CAPTURE_IMAGE = "capture_image"
@@ -46,13 +53,22 @@ ENABLE_TEST_MODE_SCHEMA = vol.Schema({})
 DISABLE_TEST_MODE_SCHEMA = vol.Schema({})
 
 
+def _get_abode_entry(hass: HomeAssistant) -> AbodeConfigEntry:
+    """Get the first loaded Abode config entry."""
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if entry.state is ConfigEntryState.LOADED:
+            return entry  # type: ignore[return-value]
+    raise ServiceValidationError("No Abode integration loaded")
+
+
 def _change_setting(call: ServiceCall) -> None:
     """Change an Abode system setting."""
+    entry = _get_abode_entry(call.hass)
     setting = call.data[ATTR_SETTING]
     value = call.data[ATTR_VALUE]
 
     try:
-        call.hass.data[DOMAIN].abode.set_setting(setting, value)
+        entry.runtime_data.abode.set_setting(setting, value)
     except AbodeException as ex:
         LOGGER.warning(ex)
 
@@ -63,7 +79,7 @@ def _capture_image(call: ServiceCall) -> None:
 
     target_entities = [
         entity_id
-        for entity_id in call.hass.data[DOMAIN].entity_ids
+        for entity_id in call.hass.data[DOMAIN]["entity_ids"]
         if entity_id in entity_ids
     ]
 
@@ -78,7 +94,7 @@ def _trigger_automation(call: ServiceCall) -> None:
 
     target_entities = [
         entity_id
-        for entity_id in call.hass.data[DOMAIN].entity_ids
+        for entity_id in call.hass.data[DOMAIN]["entity_ids"]
         if entity_id in entity_ids
     ]
 
@@ -89,11 +105,12 @@ def _trigger_automation(call: ServiceCall) -> None:
 
 async def _trigger_alarm(call: ServiceCall) -> None:
     """Trigger a manual alarm."""
+    entry = _get_abode_entry(call.hass)
     alarm_type = call.data[ATTR_ALARM_TYPE]
 
     try:
         alarm = await call.hass.async_add_executor_job(
-            call.hass.data[DOMAIN].abode.get_alarm
+            entry.runtime_data.abode.get_alarm
         )
         await call.hass.async_add_executor_job(
             alarm.trigger_manual_alarm, alarm_type
@@ -105,11 +122,12 @@ async def _trigger_alarm(call: ServiceCall) -> None:
 
 async def _acknowledge_alarm(call: ServiceCall) -> None:
     """Acknowledge a timeline alarm event."""
+    entry = _get_abode_entry(call.hass)
     timeline_id = call.data[ATTR_TIMELINE_ID]
 
     try:
         await call.hass.async_add_executor_job(
-            call.hass.data[DOMAIN].abode.acknowledge_timeline_event, timeline_id
+            entry.runtime_data.abode.acknowledge_timeline_event, timeline_id
         )
         LOGGER.info("Acknowledged timeline event: %s", timeline_id)
     except AbodeException as ex:
@@ -118,11 +136,12 @@ async def _acknowledge_alarm(call: ServiceCall) -> None:
 
 async def _dismiss_alarm(call: ServiceCall) -> None:
     """Dismiss a timeline alarm event."""
+    entry = _get_abode_entry(call.hass)
     timeline_id = call.data[ATTR_TIMELINE_ID]
 
     try:
         await call.hass.async_add_executor_job(
-            call.hass.data[DOMAIN].abode.dismiss_timeline_event, timeline_id
+            entry.runtime_data.abode.dismiss_timeline_event, timeline_id
         )
         LOGGER.info("Dismissed timeline event: %s", timeline_id)
     except AbodeException as ex:
@@ -131,9 +150,10 @@ async def _dismiss_alarm(call: ServiceCall) -> None:
 
 async def _enable_test_mode(call: ServiceCall) -> None:
     """Enable test mode."""
+    entry = _get_abode_entry(call.hass)
     try:
         await call.hass.async_add_executor_job(
-            call.hass.data[DOMAIN].abode.set_test_mode, True
+            entry.runtime_data.abode.set_test_mode, True
         )
         LOGGER.info("Test mode enabled")
     except AbodeException as ex:
@@ -142,9 +162,10 @@ async def _enable_test_mode(call: ServiceCall) -> None:
 
 async def _disable_test_mode(call: ServiceCall) -> None:
     """Disable test mode."""
+    entry = _get_abode_entry(call.hass)
     try:
         await call.hass.async_add_executor_job(
-            call.hass.data[DOMAIN].abode.set_test_mode, False
+            entry.runtime_data.abode.set_test_mode, False
         )
         LOGGER.info("Test mode disabled")
     except AbodeException as ex:
