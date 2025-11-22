@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from jaraco.abode.devices.sensor import Sensor
 
@@ -13,14 +13,14 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import LIGHT_LUX, PERCENTAGE, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import AbodeSystem
-from .const import DOMAIN
 from .entity import AbodeDevice
+
+if TYPE_CHECKING:
+    from . import AbodeConfigEntry
 
 ABODE_TEMPERATURE_UNIT_HA_UNIT = {
     "°F": UnitOfTemperature.FAHRENHEIT,
@@ -62,16 +62,14 @@ SENSOR_TYPES: tuple[AbodeSensorDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: AbodeConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Abode sensor devices."""
-    data: AbodeSystem = hass.data[DOMAIN]
-
     async_add_entities(
-        AbodeSensor(data, device, description)
+        AbodeSensor(entry, device, description)
         for description in SENSOR_TYPES
-        for device in data.abode.get_devices(generic_type="sensor")
+        for device in entry.runtime_data.abode.get_devices(generic_type="sensor")
         if description.key in device.get_value("statuses")
     )
 
@@ -84,12 +82,12 @@ class AbodeSensor(AbodeDevice, SensorEntity):
 
     def __init__(
         self,
-        data: AbodeSystem,
+        entry: AbodeConfigEntry,
         device: Sensor,
         description: AbodeSensorDescription,
     ) -> None:
         """Initialize a sensor for an Abode device."""
-        super().__init__(data, device)
+        super().__init__(entry, device)
         self.entity_description = description
         self._attr_unique_id = f"{device.uuid}-{description.key}"
 

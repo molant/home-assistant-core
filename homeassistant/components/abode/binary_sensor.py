@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from jaraco.abode.devices.binary_sensor import BinarySensor
 
@@ -10,24 +10,22 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util.enum import try_parse_enum
 
-from . import AbodeSystem
-from .const import DOMAIN
 from .entity import AbodeDevice
+
+if TYPE_CHECKING:
+    from . import AbodeConfigEntry
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: AbodeConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Abode binary sensor devices."""
-    data: AbodeSystem = hass.data[DOMAIN]
-
     device_types = [
         "connectivity",
         "moisture",
@@ -37,8 +35,8 @@ async def async_setup_entry(
     ]
 
     async_add_entities(
-        AbodeBinarySensor(data, device)
-        for device in data.abode.get_devices(generic_type=device_types)
+        AbodeBinarySensor(entry, device)
+        for device in entry.runtime_data.abode.get_devices(generic_type=device_types)
     )
 
 

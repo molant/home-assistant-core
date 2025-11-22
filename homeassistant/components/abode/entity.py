@@ -1,13 +1,19 @@
 """Support for Abode Security System entities."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from jaraco.abode.automation import Automation as AbodeAuto
 from jaraco.abode.devices.base import Device as AbodeDev
 
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
-from . import AbodeSystem
 from .const import ATTRIBUTION, DOMAIN
+
+if TYPE_CHECKING:
+    from . import AbodeConfigEntry, AbodeSystem
 
 
 class AbodeEntity(Entity):
@@ -16,10 +22,11 @@ class AbodeEntity(Entity):
     _attr_attribution = ATTRIBUTION
     _attr_has_entity_name = True
 
-    def __init__(self, data: AbodeSystem) -> None:
+    def __init__(self, entry: AbodeConfigEntry) -> None:
         """Initialize Abode entity."""
-        self._data = data
-        self._attr_should_poll = data.polling
+        self._entry = entry
+        self._data: AbodeSystem = entry.runtime_data
+        self._attr_should_poll = entry.runtime_data.polling
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to Abode connection status updates."""
@@ -29,7 +36,7 @@ class AbodeEntity(Entity):
             self._update_connection_status,
         )
 
-        self.hass.data[DOMAIN].entity_ids.add(self.entity_id)
+        self.hass.data[DOMAIN]["entity_ids"].add(self.entity_id)
 
     async def async_will_remove_from_hass(self) -> None:
         """Unsubscribe from Abode connection status updates."""
@@ -46,9 +53,9 @@ class AbodeEntity(Entity):
 class AbodeDevice(AbodeEntity):
     """Representation of an Abode device."""
 
-    def __init__(self, data: AbodeSystem, device: AbodeDev) -> None:
+    def __init__(self, entry: AbodeConfigEntry, device: AbodeDev) -> None:
         """Initialize Abode device."""
-        super().__init__(data)
+        super().__init__(entry)
         self._device = device
         self._attr_unique_id = device.uuid
 
@@ -100,9 +107,9 @@ class AbodeDevice(AbodeEntity):
 class AbodeAutomation(AbodeEntity):
     """Representation of an Abode automation."""
 
-    def __init__(self, data: AbodeSystem, automation: AbodeAuto) -> None:
+    def __init__(self, entry: AbodeConfigEntry, automation: AbodeAuto) -> None:
         """Initialize for Abode automation."""
-        super().__init__(data)
+        super().__init__(entry)
         self._automation = automation
         self._attr_name = automation.name
         self._attr_unique_id = automation.id

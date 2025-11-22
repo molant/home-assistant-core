@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from jaraco.abode.devices.base import Device
 from jaraco.abode.devices.camera import Camera as AbodeCam
@@ -12,30 +12,29 @@ import requests
 from requests.models import Response
 
 from homeassistant.components.camera import Camera
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import Event, HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import Throttle
 
-from . import AbodeSystem
-from .const import DOMAIN, LOGGER
+from .const import LOGGER
 from .entity import AbodeDevice
+
+if TYPE_CHECKING:
+    from . import AbodeConfigEntry
 
 MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=90)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: AbodeConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Abode camera devices."""
-    data: AbodeSystem = hass.data[DOMAIN]
-
     async_add_entities(
-        AbodeCamera(data, device, timeline.CAPTURE_IMAGE)
-        for device in data.abode.get_devices(generic_type="camera")
+        AbodeCamera(entry, device, timeline.CAPTURE_IMAGE)
+        for device in entry.runtime_data.abode.get_devices(generic_type="camera")
     )
 
 
@@ -45,9 +44,9 @@ class AbodeCamera(AbodeDevice, Camera):
     _device: AbodeCam
     _attr_name = None
 
-    def __init__(self, data: AbodeSystem, device: Device, event: Event) -> None:
+    def __init__(self, entry: AbodeConfigEntry, device: Device, event: Event) -> None:
         """Initialize the Abode device."""
-        AbodeDevice.__init__(self, data, device)
+        AbodeDevice.__init__(self, entry, device)
         Camera.__init__(self)
         self._event = event
         self._response: Response | None = None

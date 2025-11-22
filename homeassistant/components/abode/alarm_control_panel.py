@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from jaraco.abode.devices.alarm import Alarm
 from jaraco.abode.exceptions import Exception as AbodeException
 
@@ -10,24 +12,28 @@ from homeassistant.components.alarm_control_panel import (
     AlarmControlPanelEntityFeature,
     AlarmControlPanelState,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import AbodeSystem
-from .const import DOMAIN, LOGGER
+from .const import LOGGER
 from .entity import AbodeDevice
+
+if TYPE_CHECKING:
+    from . import AbodeConfigEntry
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: AbodeConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Abode alarm control panel device."""
-    data: AbodeSystem = hass.data[DOMAIN]
     async_add_entities(
-        [AbodeAlarm(data, await hass.async_add_executor_job(data.abode.get_alarm))]
+        [
+            AbodeAlarm(
+                entry, await hass.async_add_executor_job(entry.runtime_data.abode.get_alarm)
+            )
+        ]
     )
 
 
@@ -76,7 +82,7 @@ class AbodeAlarm(AbodeDevice, AlarmControlPanelEntity):
     def acknowledge_timeline_event(self, timeline_id: str) -> None:
         """Acknowledge a timeline alarm event."""
         try:
-            self.hass.data[DOMAIN].abode.acknowledge_timeline_event(timeline_id)
+            self._data.abode.acknowledge_timeline_event(timeline_id)
             LOGGER.info("Acknowledged timeline event: %s", timeline_id)
         except AbodeException as ex:
             LOGGER.error("Failed to acknowledge timeline event: %s", ex)
@@ -84,7 +90,7 @@ class AbodeAlarm(AbodeDevice, AlarmControlPanelEntity):
     def dismiss_timeline_event(self, timeline_id: str) -> None:
         """Dismiss a timeline alarm event."""
         try:
-            self.hass.data[DOMAIN].abode.dismiss_timeline_event(timeline_id)
+            self._data.abode.dismiss_timeline_event(timeline_id)
             LOGGER.info("Dismissed timeline event: %s", timeline_id)
         except AbodeException as ex:
             LOGGER.error("Failed to dismiss timeline event: %s", ex)

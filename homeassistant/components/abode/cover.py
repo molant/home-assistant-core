@@ -1,30 +1,30 @@
 """Support for Abode Security System covers."""
 
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from jaraco.abode.devices.cover import Cover
 
 from homeassistant.components.cover import CoverEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import AbodeSystem
-from .const import DOMAIN
 from .entity import AbodeDevice
+
+if TYPE_CHECKING:
+    from . import AbodeConfigEntry
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: AbodeConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Abode cover devices."""
-    data: AbodeSystem = hass.data[DOMAIN]
-
     async_add_entities(
-        AbodeCover(data, device)
-        for device in data.abode.get_devices(generic_type="cover")
+        AbodeCover(entry, device)
+        for device in entry.runtime_data.abode.get_devices(generic_type="cover")
     )
 
 
